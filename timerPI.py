@@ -81,9 +81,11 @@ def getCurrentTime(channel):
     """Gets the current hour and minutes, formats it and speaks it"""
     hour = datetime.now().hour;
     minute = datetime.now().minute;
+    seconds = datetime.now().second;
     print(hour);
     print(minute);
-    text = "Η ώρα είναι: " + speakNum(hour) + " και " + speakNum(minute);
+    print(seconds);
+    text = "Η ώρα είναι: " + speakNum(hour) + " και " + speakNum(minute) + " λεπτά και " + speakNum(seconds) + " δευτερόλεπτα";
     print(text);
     speak(text);
 
