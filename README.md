@@ -13,6 +13,6 @@ You are ready to run the script using `python3 timerPI.py`
 
 # Roadmap (sort of)
 - Configuration files
-- Tell seconds as well
+- ~~Tell seconds as well~~ DONE
 - Any language
 - Connect a screen to also display the time
