@@ -12,7 +12,7 @@ A simple python script that uses TTS to speak out the current time in greek.
 You are ready to run the script using `python3 timerPI.py`
 
 # Roadmap (sort of)
-- Configuration files
+- ~~Configuration files~~ Mostly done, more settings could be added in the future
 - ~~Tell seconds as well~~ DONE
-- Any language
+- ~~Any language~~ Sort of done, more languages may be added in the `langs.py` file
 - Connect a screen to also display the time
