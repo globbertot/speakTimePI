@@ -1,19 +1,125 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime
 from time import sleep
+from gpiozero import Button
+from signal import pause
 import subprocess
-import RPi.GPIO as GPIO
+import requests
+import os
 from gtts import gTTS
+from langs import languages
 
-lePin = 16; # Change this if neccesery to your GPIO PIN
-internet = True;
+confFile = "./conf";
 
-def speak(text):
-    """Calls espeak (greek) to say the text TTS"""
+# Navigation stuff / Setup #
+def showHelp():
+    os.system("clear");
+    print("-----\n\nHELP MENU\n\n-----\n`help` - Shows this menu\n`lang` - set up the language\n`pin` - set up the GPIO pin\n`done` - exit the setup\n\n");
+
+def langSetup():
+    os.system("clear");
+    good = False;
+    langCode = 'el';
+
+    while not good:
+        ipt = input("To list language options write `ls`\nPlease enter your language: ");
+        ipt = ipt.lower();
+
+        if (ipt == 'ls'):
+            for lang in languages:
+                langs = languages[lang];
+                print(f"Lang: {lang} || {langs['long']}");
+            continue;
+
+        if (len(ipt) > 2 or not languages.get(ipt)):
+            print(f"Language {ipt} is not supported yet, please list the laungages if you need a refresher.");
+            continue;
+
+        langCode = ipt;
+        good = True;
+
+    with open(confFile, 'a') as f:
+        f.write(f"lang:{langCode}\n");
+
+def pinSetup():
+    os.system("clear");
+    good = False;
+    pin = 16;
+
+    while not good:
+        ipt = input("Please enter the GPIO (BCM) pin you have connected the button to: ");
+
+        if (int(ipt) < 0 or int(ipt) > 27): #TODO: Maybe validate the pin better?
+            print("Invalid GPIO pin\n");
+            continue;
+
+        good = True;
+        pin = int(ipt);
+
+    with open(confFile, 'a') as f:
+        f.write(f"pin:{pin}\n");
+
+def mainMenu():
+    done = False;
+
+    if (os.path.isfile(confFile)):
+        done = True;
+
+    while not done:
+        cmd = input("\n\nWelcome to narrateTime setup\n\nFor all the commands type `help`\n\nCommand: ");
+        cmd = cmd.lower();
+
+        if (cmd == "help"):
+            showHelp();
+        elif (cmd == "lang"):
+            langSetup();
+        elif (cmd == "pin"):
+            pinSetup();
+        elif (cmd == "done"):
+            input("Note: If you change your mind about the settings you can delete the conf file to show this menu again.\nPress enter to actually exit");
+            done = True;
+        else:
+            print(f"Unknown command: {cmd}");
+
+    os.system("clear");
+
+def parseConf():
     try:
-        print(internet);
-        if (internet == True):
-            tts = gTTS(text=text, lang='el');
+        lang = 'el';
+        pin = 16;
+        with open(confFile, 'r') as f:
+            for line in f:
+                line = line.strip(); # Remove \n 
+
+                if (line.startswith("lang:")):
+                    lang = line.split(":", 1)[1];
+                    if (not lang or not languages.get(lang)):
+                        lang = "el" # Revert back to default.
+
+                elif (line.startswith("pin:")):
+                    pin = int(line.split(":", 1)[1]);
+                    if (pin < 0 or pin > 27):
+                        pin = 16;
+
+        return {"lang": lang, "pin": pin};
+    except FileNotFoundError:
+        print("No configuration, reverting back to defaults..");
+        return {"lang": 'el', "pin": 16};
+
+# The real thing
+def checkInternet():
+    try:
+        r = requests.get("https://google.com", timeout=5);
+        return r.status_code == 200;
+    except Exception as e:
+        return False;
+
+def speak(text, conf):
+    """Calls google translate or espeak to say the text TTS"""
+    try:
+        internet = checkInternet();
+        if (internet):
+            tts = gTTS(text=text, lang=conf["lang"]);
             tts.save("output.mp3");
             subprocess.run(["mpg123", "output.mp3"], check=True);
         else:
@@ -25,86 +131,62 @@ def speak(text):
         else:
             print("Are you sure you have `espeak` installed?");
 
-def speakNum(num):
+def speakNum(num, lang='el'):
     """
     Return's the long version of a number
     For example: speakNum(5) -> πέντε || speakNum(12) -> δώδεκα
     """
-    if (num == 20):
-        return "είκοσι";
-    elif (num == 12):
-        return "δώδεκα";
-    elif (num == 11):
-        return "έντεκα";
-    elif (num == 0):
-        return "μηδέν";
-    elif (num == 60):
-        return "εξήντα";
-    else:
-        firstDigit = num // 10;
-        lastDigit = num % 10;
+    try:
+        langDict = languages.get(lang);
+        if (not langDict):
+            raise ValueError(f"{lang} is not supported yet.");
+
+        if (num in langDict):
+            return langDict[num]; # Special cases, ex: 10 returns ten
+
+        firstDigit = num // 10 * 10; # Get the tens (20, 10, 30..)
+        lastDigit = num % 10; # Get the ones (1, 2, 3..)
         rtn = "";
 
-        if (firstDigit == 1):
-            rtn += "δέκα ";
-        elif (firstDigit == 2):
-            rtn += "είκοσι ";
-        elif (firstDigit == 3):
-            rtn += "τριάντα ";
-        elif (firstDigit == 4):
-            rtn += "σαράντα ";
-        elif (firstDigit == 5):
-            rtn += "πεενήντα ";
+        if (firstDigit > 0):
+            rtn += langDict.get(firstDigit, "") + " ";
 
-        if (lastDigit == 1 and firstDigit != 1):
-            rtn += "εένα";
-        elif (lastDigit == 2 and firstDigit != 1):
-            rtn += "δύο";
-        elif (lastDigit == 3):
-            rtn += "τρία";
-        elif (lastDigit == 4):
-            rtn += "τέσσερα";
-        elif (lastDigit == 5):
-            rtn += "πέντε";
-        elif (lastDigit == 6):
-            rtn += "έξι";
-        elif (lastDigit == 7):
-            rtn += "επτά";
-        elif (lastDigit == 8):
-            rtn += "οκτώ";
-        elif (lastDigit == 9):
-            rtn += "εννιά";
+        if (lastDigit > 0):
+            rtn += langDict.get(lastDigit, "");
 
         return rtn;
+    except Exception as e:
+        print(f"Error getting number..\nException: {e}");
 
-def getCurrentTime(channel):
+def getCurrentTime(conf):
     """Gets the current hour and minutes, formats it and speaks it"""
+    print("Pressed");
     hour = datetime.now().hour;
     minute = datetime.now().minute;
     seconds = datetime.now().second;
-    print(hour);
-    print(minute);
-    print(seconds);
-    text = "Η ώρα είναι: " + speakNum(hour) + " και " + speakNum(minute) + " λεπτά και " + speakNum(seconds) + " δευτερόλεπτα";
-    print(text);
-    speak(text);
+
+    text = languages[conf["lang"]].get("timePhrase");
+    localized = text.format(
+        hour=speakNum(hour, conf["lang"]),
+        minute=speakNum(minute, conf["lang"]),
+        second=speakNum(seconds, conf["lang"]),
+    );
+
+    speak(localized, conf);
 
 def main():
-    global internet;
-    internet = True if input("Do you have internet (y/N): ").lower() == 'y' else False;
+    mainMenu();
+    config = parseConf();
 
-    GPIO.setmode(GPIO.BCM);
-    GPIO.setup(lePin, GPIO.IN, pull_up_down=GPIO.PUD_UP);
-
-    flag = True;
+    btn = Button(config["pin"], bounce_time=0.1);
+    btn.when_pressed = lambda: getCurrentTime(config);
     print("Press the button to speak the current time");
-    GPIO.add_event_detect(lePin, GPIO.FALLING, callback=getCurrentTime, bouncetime=300);
     
     try:
-        while flag:
-            sleep(0.1); # Small delay to reduce load while also running continously
+        pause();
     except KeyboardInterrupt:
-        GPIO.cleanup();
+        print("Exiting..");
+        btn.close();
 
 if __name__ == "__main__":
     main();
