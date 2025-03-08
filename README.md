@@ -1,5 +1,5 @@
 # speakTimePI
-A simple python script that uses TTS to speak out the current time in greek.
+A simple python script that uses TTS to speak out the current time in *any* language.
 
 # Requirements
 - `espeak` or `mpg123 and an internet connection`
